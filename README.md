@@ -1,3 +1,7 @@
+# rboc
+
+The rboc gem is a ruby interface to the data API provided by the U.S. Census Bureau (the "boc" in rboc stands for Bureau of the Census).
+
 Code examples:
 
     result = Census.acs(year: 2011) do |q|
