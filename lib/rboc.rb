@@ -2,7 +2,9 @@ require 'curb'
 require 'json'
 require 'nokogiri'
 
-class Census
+# A module defining methods for accessing the U.S. Census data API.
+#
+module Census
 
   API_URL = 'http://api.census.gov/data'
 
@@ -50,11 +52,13 @@ class Census
       end
     end
 
+    # The summary level is understood relative to this geography.
+    #
     def contained_in=(hsh)
       @contained_in = hsh
     end
 
-    # Returns the geography portio of the API GET string.
+    # Returns the geography portion of the API GET string.
     #
     def to_s
       k, v = @summary_level.first
@@ -80,7 +84,8 @@ class Census
       @api_key = key
     end
 
-    # Returns the API key to be used for this query.
+    # Returns the API key to be used for this query. If the key hasn't been set explicitly, this
+    # method attempts to load a key previously installed by Census#install_key!.
     #
     def api_key
       unless @api_key
@@ -116,6 +121,8 @@ class Census
       self
     end
 
+    # Returns the query portion of the API GET string.
+    #
     def to_s
       v = @variables
       if v.is_a? Array
@@ -128,12 +135,18 @@ class Census
 
   class <<self
 
+    # Writes the given key to a local file. If a key is installed, then you don't have to specify
+    # a key in your query.
+    #
     def install_key!(key)
       File.open INSTALLED_KEY_PATH, 'w' do |f|
         f.write key
       end
     end
 
+    # Accesses the data api for the ACS and returns the unmodified body of the HTTP response. 
+    # If a block is given, it will be called on the query argument.
+    #
     def acs_raw(query: Query.new, year: ACS_DEFAULT_YEAR, period: ACS_DEFAULT_PERIOD)
       unless ACS_YEARS.include? year
         raise ArgumentError, "Invalid year: #{year}"
@@ -153,6 +166,9 @@ class Census
       # c.body_str
     end
     
+    # Accesses the the data api for the ACS and parses the result into a Census::Data object.
+    # If a block is given, it will be called on the query argument.
+    #
     def acs(query: Query.new, year: ACS_DEFAULT_YEAR, period: ACS_DEFAULT_PERIOD, &block)
       json = acs_raw(query: query, year: year, period: period, &block)
     end
