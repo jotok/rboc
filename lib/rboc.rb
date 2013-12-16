@@ -19,6 +19,37 @@ module Census
   # A result data set
   #
   class Data
+
+    include Enumerable
+
+    attr_reader :colnames, :rows
+
+    def initialize(json='')
+      if json.empty?
+        @colnames = []
+        @rows = []
+      else
+        o = JSON.parse json
+        @colnames, *@rows = *o
+      end
+    end
+
+    def each
+      @rows.each do |row|
+        yield Hash[@colnames.zip row]
+      end
+    end
+
+    def merge!(json)
+      o = JSON.parse json
+      colnames, *rows = *o
+
+      @colnames += colnames
+      @rows.map!.with_index do |row, i|
+        row += rows[i]
+      end
+    end
+
   end
 
   # A Census geography
@@ -121,13 +152,23 @@ module Census
       self
     end
 
+    # Constructs a new Query object with a subset of variables. Creates a shallow copy of this
+    # Query's geography and api key.
+    #
+    def [](rng)
+      variables = @variables[rng]
+      q = Query.new
+      q.variables = variables
+      q.geo = @geo
+      q.api_key = @api_key
+      q
+    end
+
     # Returns the query portion of the API GET string.
     #
     def to_s
       v = @variables
-      if v.is_a? Array
-        v = v.join(',')
-      end
+      v = v.join(',') if v.is_a? Array
 
       "get=#{v}&#{geo.to_s}&key=#{self.api_key}"
     end
@@ -156,21 +197,30 @@ module Census
         raise ArgumentError, "Invalid period: #{period}"
       end
 
-      if block_given?
-        yield query
-      end
+      yield query if block_given?
 
       url = [API_URL, year, "acs#{period}", query.to_s].join('/')
 
-      # c = Curl.get query.to_s
+      # TODO do something with the response code
+      # c = Curl.get url
       # c.body_str
     end
     
     # Accesses the the data api for the ACS and parses the result into a Census::Data object.
     # If a block is given, it will be called on the query argument.
     #
-    def acs(query: Query.new, year: ACS_DEFAULT_YEAR, period: ACS_DEFAULT_PERIOD, &block)
-      json = acs_raw(query: query, year: year, period: period, &block)
+    def acs(query: Query.new, year: ACS_DEFAULT_YEAR, period: ACS_DEFAULT_PERIOD)
+      yield query if block_given?
+
+      # download 50 variables at a time
+      d = Data.new
+      offset = 0
+      while 50 * offset <= query.variables.length
+        json = acs_raw(query: query[offset...(offset+50)], year: year, period: period)
+        d.merge! json
+      end
+
+      d
     end
 
   end
