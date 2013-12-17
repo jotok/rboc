@@ -1,7 +1,9 @@
 require 'curb'
 require 'json'
-require 'nokogiri'
 require 'uri'
+
+require 'rboc/geo'
+require 'rboc/data'
 
 # A module defining methods for accessing the U.S. Census data API.
 #
@@ -27,137 +29,6 @@ module Census
     'acs1' => 'acs1/profile',
     'acs3' => 'acs3/profile'
   }
-
-  # A result data set
-  #
-  class Data
-
-    # Split a list of column names into geographic columns and data columns
-    def self.split_colnames(colnames)
-      geocolnames = []
-      datacolnames = []
-      colnames.each do |s|
-        if Geography::LEVELS.include? s
-          geocolnames << s
-        else
-          datacolnames << s
-        end
-      end
-
-      [geocolnames, datacolnames]
-    end
-
-    include Enumerable
-
-    attr_reader :colnames, :rows
-
-    # Constructs a new data object from Census data returned by the API. The format of JSON
-    # should be:
-    #     [["column1", "column2", ...], [row11, row12, ...], [row21, row22, ...], ...]
-    #
-    def initialize(json='[]')
-      json = JSON.parse json if json.is_a? String
-      @colnames, *@rows = *json
-      @colmap = Hash[@colnames.zip (0..@colnames.length)]
-
-      @geocolnames, @datacolnames = self.class.split_colnames colnames
-    end
-
-    def each
-      @rows.each do |row|
-        yield Hash[@colnames.zip row]
-      end
-    end
-
-    # Merges an existing Census data set with additional data returned from the API. Currently,
-    # this method assumes columns and rows are returned in a consistent order given the same
-    # geography.
-    #
-    def merge!(json)
-      json = JSON.parse json if json.is_a? String
-      colnames, *rows = *json
-      colmap = Hash[colnames.zip (0..colnames.length)]
-      geocolnames, datacolnames = self.class.split_colnames colnames
-
-      if geocolnames != @geocolnames
-        raise ArgumentError, "Mismatched geographies"
-      end
-
-      @rows.map!.with_index do |row, i|
-        if  @geocolnames.any? {|s| row[@colmap[s]] != rows[i][colmap[s]]}
-          raise ArgumentError, "Mismatched rows"
-        end
-
-        row += datacolnames.map {|s| rows[i][colmap[s]]}
-      end
-
-      n = @colnames.length
-      @colmap.merge! Hash[datacolnames.zip (n..(n+datacolnames.length))]
-      @colnames += datacolnames
-      @datacolnames += datacolnames
-
-      self
-    end
-
-  end
-
-  # A Census geography
-  #
-  class Geography
-    LEVELS = [
-      'us', 'region', 'division', 'state', 'county', 'tract'
-    ]
-
-    LEVEL_ALIAS = {
-      'regions' => 'region',
-      'divisions' => 'division',
-      'states' => 'state',
-      'counties' => 'county',
-      'tracts' => 'tract',
-    }
-
-    attr_accessor :summary_level, :contained_in
-
-    def initialize
-      @summary_level = {}
-      @contained_in = {}
-    end
-
-    # Sets the summary level to the specified value. If 'lvl' is a hash, it should
-    # only contain one element.
-    #
-    def summary_level=(lvl)
-
-      if lvl.is_a? Hash
-        k, v = lvl.first
-        k = LEVEL_ALIAS[k] if LEVEL_ALIAS[k] 
-        @summary_level[k] = v
-      else
-        k = LEVEL_ALIAS[lvl] || lvl
-        @summary_level[k] = '*'
-      end
-    end
-
-    def to_hash
-      h = {}
-      @summary_level['us'] = '*' if @summary_level.empty?
-
-      k, v = @summary_level.first
-      h['for'] = "#{k}:#{v}"
-
-      unless @contained_in.empty?
-        h['in'] = @contained_in.map {|k, v| "#{k}:#{v}"}.join("+")
-      end
-
-      h
-    end
-
-    # Returns the geography portion of the API GET string.
-    #
-    def to_s
-      URI.encode_www_form self.to_hash
-    end
-  end
 
   class CensusApiError < StandardError; end
   class InvalidQueryError < CensusApiError; end
