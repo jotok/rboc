@@ -1,31 +1,47 @@
-# rboc
+# rboc: U.S. Census data in ruby
 
-The `rboc` gem is a ruby interface to the data API provided by the U.S. Census Bureau (the "boc" in `rboc` stands for Bureau of the Census). Currently, this gem provides minimal wrapper around the HTTP/GET interface. For example, you can access the most recent 5-year population estimates given by the American Communities Survey (ACS) by requesting the URL:
+## Quick Start
+
+For each Census data file (e.g., acs5, sf1) there is a corresponding class method in Census (e.g. `Census.acs5`, `Census.sf1`). These methods take block arguments that can be used to specify your data request. For example, the API call
 
     http://api.census.gov/data/2011/acs5?key=xxx&for=county:*&in=state:19&get=B00001_001E
 
-Here, "xxx" is a stand-in for your API key. The `rboc` syntax for this request is
+(which requests the 5-year average population estimate at the county level for all counties in Iowa) is equivalent to the `rboc` method call
 
-    result = Census.acs5 do |q|
-      q.variables = ['B00001_001E']
-      q.geo.summary_level = 'county'
-      q.geo.contained_in = { 'state' => 19 }
-      q.api_key = 'xxx'
-    end
+    Census.acs5 {|q| q.get('B00001_001E').for('counties').in('state' => 19).key('xxx')}
 
-or, more succinctly,
+To specify the year of data that you're looking for, use a keyword argument:
 
-    result = Census.acs5 {|q| q.get('B00001_001E').for('counties').in('state' => 19).key('xxx')}
+    Census.acs5(year: 2010) {|q| q.get('B00001_001E').for('counties').in('state' => 19).key('xxx')}
 
-Note that the user needs to know the variable and geographic codes that they are interested in.
+The most recent year is used by default.
 
-## Install your API key
-
-Rather than supply your API key for every query, you can install your key by calling
+You can "install" your API key (i.e., save it to a file in the gem's installation directory) by calling
 
     Census.install_key! 'xxx'
 
-This saves the key in a file in the gem's installation directory. In subsequent queries, the installed key will be used if no key is explicitly specified. Because the key is saved to the gem's directory, it will have to be reinstalled after the gem is upgraded.
+Subsequent `rboc` queries will use your installed key unless another key is specified.
+
+Currently, you have to know the variable and geography codes that you're interested in. `rboc` will not help you.
+
+## Deliberate Start
+
+The `rboc` gem is a ruby interface to the data API provided by the U.S. Census Bureau (the "boc" in `rboc` stands for Bureau of the Census). It provides a rubyish wrapper around the HTTP/GET interface and performs some basic validation on the request and response. If you're new to the Census API, then you may want to browse the [developer documentation](http://www.census.gov/developers/) and the [data documentation](http://www.census.gov/developers/data/) on the Census website. Before accessing the API you will need to [request a key](http://www.census.gov/developers/tos/key_request.html).
+
+Census data is divided between a number of files, like the American Community Survey (ACS) 5 year estimates file, the ACS 3 year estimates file, and the 2010 Census summary files. A complete list of files is found in the data documentation. A list of file abbreviations is given by `Census::FILES`. For each abbreviation there is a corresponding class method in the `Census` module which is used to access the file data. These methods all have the same signature. Using the "acs5" file as an example:
+
+    Census.acs5(year: y, query: q) {|q| ...}
+
+All arguments are optional (although you'll probably get an `InvalidQueryError` if you don't specify any query parameters). The `year` defaults to the most recent year of data for the given file, and `query` defaults to an empty query. If a block is provided, then it's called on the query argument. In practice, you'll probably either provide a query or a block:
+
+    my_q = Census::Query.new
+    my_q.geo.summary_level = 'state'
+    my_q.variables = ['B00001_001E'] # this should be an array
+    result1 = Census.acs5(query: my_q)
+
+    result2 = Census.acs5 {|q| q.get('B00001_001E').for('state')}
+
+This example also demonstrates two ways to set query parameters. You can either assign directly to the query's instance variables, or you can use a chainable syntax that mirrors the parameters to the Census API.
 
 ## Future Work
 
