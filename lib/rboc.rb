@@ -9,13 +9,24 @@ require 'rboc/data'
 #
 module Census
 
+  # Base URL of the Census data API.
+  #
   API_URL = 'http://api.census.gov/data'
 
+  # Path to the installed API key relative to this file.
+  #
   INSTALLED_KEY_REL_PATH = '../data/installed_key'
+
+  # Path to the installed API key.
+  #
   INSTALLED_KEY_PATH = File.join(File.dirname(File.expand_path(__FILE__)), INSTALLED_KEY_REL_PATH)
 
+  # Data files accessible through the Census API.
+  #
   FILES = ['acs1', 'acs1_cd', 'acs3', 'acs5', 'sf1', 'sf3']
 
+  # List valid years of data for each data file.
+  #
   FILE_VALID_YEARS = {
     'acs1'    => [2012],
     'acs1_cd' => [2011],
@@ -35,6 +46,8 @@ module Census
   class NoMatchingRecordsError < CensusApiError; end
   class ServerSideError < CensusApiError; end
 
+  # A class representing a query to the Census API.
+  #
   class Query
     attr_accessor :variables, :geo
 
@@ -139,7 +152,8 @@ module Census
       [API_URL, year.to_s,  "#{url_file}?#{query.to_s}"].join('/')
     end
 
-    # Accesses the data api and returns the unmodified body of the HTTP response. 
+    # Accesses the data api and returns the unmodified body of the HTTP response.  Raises errors
+    # if the HTTP response code indicates a problem.
     #
     def api_raw(year, file, url_file, query)
       url = api_url year, file, url_file, query

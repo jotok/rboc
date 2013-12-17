@@ -7,6 +7,8 @@ Gem::Specification.new do |s|
   s.authors     = ['Joshua Tokle']
   s.email       = 'jtokle@gmail.com'
   s.files       = ['lib/rboc.rb',
+                   'lib/rboc/geo.rb',
+                   'lib/rboc/data.rb',
                    'data/acs_1yr_profile_2012.xml'
                   ]
   s.homepage    = "http://github.com/jotok/rboc"
