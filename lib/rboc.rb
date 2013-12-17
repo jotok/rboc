@@ -19,6 +19,24 @@ module Census
   #
   class Data
 
+    class <<self
+
+      # Split a list of column names into geographic columns and data columns
+      def split_colnames(colnames)
+        geocolnames = []
+        datacolnames = []
+        colnames.each do |s|
+          if Geography::LEVELS.include? s
+            geocolnames << s
+          else
+            datacolnames << s
+          end
+        end
+
+        [geocolnames, datacolnames]
+      end
+    end
+
     include Enumerable
 
     attr_reader :colnames, :rows
@@ -30,6 +48,9 @@ module Census
     def initialize(json='[]')
       json = JSON.parse json if json.is_a? String
       @colnames, *@rows = *json
+      @colmap = Hash[@colnames.zip (0..@colnames.length)]
+
+      @geocolnames, @datacolnames = self.class.split_colnames colnames
     end
 
     def each
@@ -38,19 +59,32 @@ module Census
       end
     end
 
+    # Merges an existing Census data set with additional data returned from the API. Currently,
+    # this method assumes columns and rows are returned in a consistent order given the same
+    # geography.
+    #
     def merge!(json)
       json = JSON.parse json if json.is_a? String
       colnames, *rows = *json
+      colmap = Hash[colnames.zip (0..colnames.length)]
+      geocolnames, datacolnames = self.class.split_colnames colnames
 
-      if @colnames.empty?
-        @rows = rows.clone
-      else
-        @rows.map!.with_index do |row, i|
-          row += rows[i]
-        end
+      if geocolnames != @geocolnames
+        raise ArgumentError, "Mismatched geographies"
       end
 
-      @colnames += colnames
+      @rows.map!.with_index do |row, i|
+        if  @geocolnames.any? {|s| row[@colmap[s]] != rows[i][colmap[s]]}
+          raise ArgumentError, "Mismatched rows"
+        end
+
+        row += datacolnames.map {|s| rows[i][colmap[s]]}
+      end
+
+      n = @colnames.length
+      @colmap.merge! Hash[datacolnames.zip (n..(n+datacolnames.length))]
+      @colnames += datacolnames
+      @datacolnames += datacolnames
     end
 
   end

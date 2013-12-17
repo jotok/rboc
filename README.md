@@ -20,3 +20,5 @@ Code examples:
       q.get('B00001_001E', 'B00001_001M').for('tract').in('state' => 11).key('xxx')
     end
     
+Notes:
+* Currently will fail hard if (geo) columns and rows of data aren't returned in a consistent order from the API.
