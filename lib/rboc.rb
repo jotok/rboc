@@ -1,17 +1,16 @@
 require 'curb'
 require 'json'
 require 'nokogiri'
+require 'uri'
 
 # A module defining methods for accessing the U.S. Census data API.
 #
 module Census
 
-  API_URL = 'http://api.census.gov/data'
+  API_URL = 'http://api.census.gov/data/'
 
   ACS_YEARS = [2010, 2011, 2012]
   ACS_PERIODS = [1, 3, 5]
-  ACS_DEFAULT_YEAR = 2011
-  ACS_DEFAULT_PERIOD = 5
 
   INSTALLED_KEY_REL_PATH = '../data/installed_key'
   INSTALLED_KEY_PATH = File.join(File.dirname(File.expand_path(__FILE__)), INSTALLED_KEY_REL_PATH)
@@ -24,14 +23,13 @@ module Census
 
     attr_reader :colnames, :rows
 
-    def initialize(json='')
-      if json.empty?
-        @colnames = []
-        @rows = []
-      else
-        o = JSON.parse json
-        @colnames, *@rows = *o
-      end
+    # Constructs a new data object from Census data returned by the API. The format of JSON
+    # should be:
+    #     [["column1", "column2", ...], [row11, row12, ...], [row21, row22, ...], ...]
+    #
+    def initialize(json='[]')
+      json = JSON.parse json if json.is_a? String
+      @colnames, *@rows = *json
     end
 
     def each
@@ -94,23 +92,30 @@ module Census
       @contained_in = hsh
     end
 
+    def to_hash
+      h = {}
+
+      k, v = @summary_level.first
+      h['for'] = "#{k}:#{v}"
+
+      unless @contained_in.nil? || @contained_in.empty?
+        h['in'] = @contained_in.map {|k, v| "#{k}:#{v}"}.join("+")
+      end
+
+      h
+    end
+
     # Returns the geography portion of the API GET string.
     #
     def to_s
-      k, v = @summary_level.first
-      s = "for=#{k}:#{v}"
-
-      unless @contained_in.nil? || @contained_in.empty?
-        s += "&in=" + @contained_in.map {|k, v| "#{k}:#{v}"}.join("+")
-      end
-
-      s
+      URI.encode_www_form self.to_hash
     end
   end
 
-  class InvalidQueryError < StandardError; end
-  class NoMatchingRecordsError < StandardError; end
-  class ServerSideError < StandardError; end
+  class CensusApiError < StandardError; end
+  class InvalidQueryError < CensusApiError; end
+  class NoMatchingRecordsError < CensusApiError; end
+  class ServerSideError < CensusApiError; end
 
   class Query
     attr_accessor :variables, :geo
@@ -173,13 +178,22 @@ module Census
       q
     end
 
+    def to_hash
+      h = {}
+      h['key'] = self.api_key
+      h.merge! geo.to_hash
+
+      v = @variables
+      v = v.join(',') if v.is_a? Array
+      h['get'] = v
+
+      h
+    end
+
     # Returns the query portion of the API GET string.
     #
     def to_s
-      v = @variables
-      v = v.join(',') if v.is_a? Array
-
-      "get=#{v}&#{geo.to_s}&key=#{self.api_key}"
+      URI.encode_www_form self.to_hash
     end
   end
 
@@ -194,10 +208,17 @@ module Census
       end
     end
 
+    def api_url(year, file, query=Query.new)
+      yield query if block_given?
+
+      url = URI.join API_URL, year.to_s, "#{file}?#{query.to_s}"
+      url.to_s
+    end
+
     # Accesses the data api for the ACS and returns the unmodified body of the HTTP response. 
     # If a block is given, it will be called on the query argument.
     #
-    def acs_raw(query: Query.new, year: ACS_DEFAULT_YEAR, period: ACS_DEFAULT_PERIOD)
+    def acs_raw(year, period, query=Query.new)
       unless ACS_YEARS.include? year
         raise ArgumentError, "Invalid year: #{year}"
       end
@@ -208,8 +229,7 @@ module Census
 
       yield query if block_given?
 
-      url = [API_URL, year, "acs#{period}?#{query.to_s}"].join('/')
-
+      url = api_url year, "acs#{period}", query
       puts "GET #{url}"
 
       c = Curl::Easy.new url
@@ -230,17 +250,23 @@ module Census
     # Accesses the the data api for the ACS and parses the result into a Census::Data object.
     # If a block is given, it will be called on the query argument.
     #
-    def acs(query: Query.new, year: ACS_DEFAULT_YEAR, period: ACS_DEFAULT_PERIOD)
+    def acs(year, period, query=Query.new)
       yield query if block_given?
 
-      # download 50 variables at a time
-      d = Data.new
-      offset = 0
+      # download the first 50 or fewer variables
+      json = acs_raw year, period, query[0...50]
+      d = Data.new json
+
+      # download remaining variables 50 at a time
+      offset = 50
       while offset <= query.variables.length
-        json = acs_raw(query: query[offset...(offset+50)], year: year, period: period)
+        json = acs_raw year, period, query[offset...(offset+50)]
         json = JSON.parse json
 
+        # sometimes the API returns a descriptive hash (in a single element array) if the
+        # requested columns are invalid
         raise InvalidQueryError if json.first.is_a? Hash
+
         d.merge! json
         offset += 50
       end
