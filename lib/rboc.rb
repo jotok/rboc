@@ -7,34 +7,44 @@ require 'uri'
 #
 module Census
 
-  API_URL = 'http://api.census.gov/data/'
-
-  ACS_YEARS = [2010, 2011, 2012]
-  ACS_PERIODS = [1, 3, 5]
+  API_URL = 'http://api.census.gov/data'
 
   INSTALLED_KEY_REL_PATH = '../data/installed_key'
   INSTALLED_KEY_PATH = File.join(File.dirname(File.expand_path(__FILE__)), INSTALLED_KEY_REL_PATH)
+
+  FILES = ['acs1', 'acs1_cd', 'acs3', 'acs5', 'sf1', 'sf3']
+
+  FILE_VALID_YEARS = {
+    'acs1'    => [2012],
+    'acs1_cd' => [2011],
+    'acs3'    => [2012],
+    'acs5'    => [2011, 2010],
+    'sf1'     => [2010, 2000, 1990],
+    'sf3'     => [2000, 1990]
+  }
+
+  FILE_URL_SUBST = {
+    'acs1' => 'acs1/profile',
+    'acs3' => 'acs3/profile'
+  }
 
   # A result data set
   #
   class Data
 
-    class <<self
-
-      # Split a list of column names into geographic columns and data columns
-      def split_colnames(colnames)
-        geocolnames = []
-        datacolnames = []
-        colnames.each do |s|
-          if Geography::LEVELS.include? s
-            geocolnames << s
-          else
-            datacolnames << s
-          end
+    # Split a list of column names into geographic columns and data columns
+    def self.split_colnames(colnames)
+      geocolnames = []
+      datacolnames = []
+      colnames.each do |s|
+        if Geography::LEVELS.include? s
+          geocolnames << s
+        else
+          datacolnames << s
         end
-
-        [geocolnames, datacolnames]
       end
+
+      [geocolnames, datacolnames]
     end
 
     include Enumerable
@@ -85,6 +95,8 @@ module Census
       @colmap.merge! Hash[datacolnames.zip (n..(n+datacolnames.length))]
       @colnames += datacolnames
       @datacolnames += datacolnames
+
+      self
     end
 
   end
@@ -104,11 +116,17 @@ module Census
       'tracts' => 'tract',
     }
 
+    attr_accessor :summary_level, :contained_in
+
+    def initialize
+      @summary_level = {}
+      @contained_in = {}
+    end
+
     # Sets the summary level to the specified value. If 'lvl' is a hash, it should
     # only contain one element.
     #
     def summary_level=(lvl)
-      @summary_level = {}
 
       if lvl.is_a? Hash
         k, v = lvl.first
@@ -120,19 +138,14 @@ module Census
       end
     end
 
-    # The summary level is understood relative to this geography.
-    #
-    def contained_in=(hsh)
-      @contained_in = hsh
-    end
-
     def to_hash
       h = {}
+      @summary_level['us'] = '*' if @summary_level.empty?
 
       k, v = @summary_level.first
       h['for'] = "#{k}:#{v}"
 
-      unless @contained_in.nil? || @contained_in.empty?
+      unless @contained_in.empty?
         h['in'] = @contained_in.map {|k, v| "#{k}:#{v}"}.join("+")
       end
 
@@ -242,28 +255,23 @@ module Census
       end
     end
 
-    def api_url(year, file, query=Query.new)
-      yield query if block_given?
+    # Constructs the URL needed to perform the query on the given file.
+    #
+    def api_url(year, file, url_file, query)
+      year = year.to_i
+      unless FILE_VALID_YEARS[file].include? year
+        raise ArgumentError, "Invalid year '#{year}' for file '#{file}'"
+      end
 
-      url = URI.join API_URL, year.to_s, "#{file}?#{query.to_s}"
-      url.to_s
+      url_file ||= file
+      yield query if block_given?
+      [API_URL, year.to_s,  "#{url_file}?#{query.to_s}"].join('/')
     end
 
-    # Accesses the data api for the ACS and returns the unmodified body of the HTTP response. 
-    # If a block is given, it will be called on the query argument.
+    # Accesses the data api and returns the unmodified body of the HTTP response. 
     #
-    def acs_raw(year, period, query=Query.new)
-      unless ACS_YEARS.include? year
-        raise ArgumentError, "Invalid year: #{year}"
-      end
-
-      unless ACS_PERIODS.include? period
-        raise ArgumentError, "Invalid period: #{period}"
-      end
-
-      yield query if block_given?
-
-      url = api_url year, "acs#{period}", query
+    def api_raw(year, file, url_file, query)
+      url = api_url year, file, url_file, query
       puts "GET #{url}"
 
       c = Curl::Easy.new url
@@ -280,21 +288,20 @@ module Census
         c.body_str
       end
     end
-    
-    # Accesses the the data api for the ACS and parses the result into a Census::Data object.
-    # If a block is given, it will be called on the query argument.
+
+    # Accesses the the data api and parses the result into a Census::Data object.
     #
-    def acs(year, period, query=Query.new)
+    def api_data(year, file, url_file, query)
       yield query if block_given?
 
       # download the first 50 or fewer variables
-      json = acs_raw year, period, query[0...50]
+      json = api_raw year, file, url_file, query[0...50]
       d = Data.new json
 
       # download remaining variables 50 at a time
       offset = 50
       while offset <= query.variables.length
-        json = acs_raw year, period, query[offset...(offset+50)]
+        json = api_raw year, file, url_file, query[offset...(offset+50)]
         json = JSON.parse json
 
         # sometimes the API returns a descriptive hash (in a single element array) if the
@@ -309,5 +316,22 @@ module Census
     end
 
   end
-end
 
+  def self.api_call(file, url_file)
+
+    define_singleton_method file do |year: FILE_VALID_YEARS[file].first, query: Query.new, &block|
+      # api_data year, file, url_file, &block
+      api_url year, file, url_file, query, &block
+    end
+
+    define_singleton_method(file+'_raw') do |year: FILE_VALID_YEARS[file], query: Query.new, &block|
+      # api_raw year, file, url_file, &block
+      api_url year, file, url_file, query, &block
+    end
+  end
+
+  FILES.each do |f| 
+    self.api_call f, FILE_URL_SUBST[f]
+  end
+
+end
