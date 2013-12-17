@@ -10,7 +10,7 @@ module Census
 
   ACS_YEARS = [2010, 2011, 2012]
   ACS_PERIODS = [1, 3, 5]
-  ACS_DEFAULT_YEAR = 2012
+  ACS_DEFAULT_YEAR = 2011
   ACS_DEFAULT_PERIOD = 5
 
   INSTALLED_KEY_REL_PATH = '../data/installed_key'
@@ -41,13 +41,18 @@ module Census
     end
 
     def merge!(json)
-      o = JSON.parse json
-      colnames, *rows = *o
+      json = JSON.parse json if json.is_a? String
+      colnames, *rows = *json
+
+      if @colnames.empty?
+        @rows = rows.clone
+      else
+        @rows.map!.with_index do |row, i|
+          row += rows[i]
+        end
+      end
 
       @colnames += colnames
-      @rows.map!.with_index do |row, i|
-        row += rows[i]
-      end
     end
 
   end
@@ -102,6 +107,10 @@ module Census
       s
     end
   end
+
+  class InvalidQueryError < StandardError; end
+  class NoMatchingRecordsError < StandardError; end
+  class ServerSideError < StandardError; end
 
   class Query
     attr_accessor :variables, :geo
@@ -199,11 +208,23 @@ module Census
 
       yield query if block_given?
 
-      url = [API_URL, year, "acs#{period}", query.to_s].join('/')
+      url = [API_URL, year, "acs#{period}?#{query.to_s}"].join('/')
 
-      # TODO do something with the response code
-      # c = Curl.get url
-      # c.body_str
+      puts "GET #{url}"
+
+      c = Curl::Easy.new url
+      c.perform
+
+      case c.response_code
+      when 400
+        raise InvalidQueryError
+      when 204
+        raise NoMatchingRecordsError
+      when 500
+        raise ServerSideError
+      else
+        c.body_str
+      end
     end
     
     # Accesses the the data api for the ACS and parses the result into a Census::Data object.
@@ -215,9 +236,13 @@ module Census
       # download 50 variables at a time
       d = Data.new
       offset = 0
-      while 50 * offset <= query.variables.length
+      while offset <= query.variables.length
         json = acs_raw(query: query[offset...(offset+50)], year: year, period: period)
+        json = JSON.parse json
+
+        raise InvalidQueryError if json.first.is_a? Hash
         d.merge! json
+        offset += 50
       end
 
       d
