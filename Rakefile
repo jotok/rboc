@@ -2,9 +2,7 @@ PROJECT = 'rboc'
 GEMSPEC_FILE = "#{PROJECT}.gemspec"
 API_KEY_FILE = 'data/installed_key'
 
-f = File.open GEMSPEC_FILE
-GEMSPEC = eval f.read
-f.close
+GEMSPEC = eval File.read(GEMSPEC_FILE)
 
 task :default => [:build, :install]
 
@@ -18,7 +16,7 @@ task :install do |t|
   if File.exists? API_KEY_FILE
     print 'installing API key... '
     require 'rboc'
-    File.open(API_KEY_FILE) {|f| Census.install_key! f.read}
+    Census.install_key! File.read(API_KEY_FILE)
     puts 'ok'
   end
 end
