@@ -16,8 +16,9 @@ task :install do |t|
   sh "gem install #{PROJECT}-#{GEMSPEC.version}.gem"
   
   if File.exists? API_KEY_FILE
-    puts "installing API key"
+    print 'installing API key... '
     require 'rboc'
     File.open(API_KEY_FILE) {|f| Census.install_key! f.read}
+    puts 'ok'
   end
 end

@@ -1,6 +1,6 @@
 Gem::Specification.new do |s|
   s.name        = 'rboc'
-  s.version     = '0.0.0'
+  s.version     = '1.0.0'
   s.date        = '2013-12-16'
   s.summary     = 'An interface to the API provided by the U.S. Census Bureau'
   s.description = s.summary
@@ -13,4 +13,7 @@ Gem::Specification.new do |s|
                   ]
   s.homepage    = "http://github.com/jotok/rboc"
   s.license     = 'Public Domain'
+
+  s.add_runtime_dependency 'curb', '~> 0.8.5'
+  s.add_runtime_dependency 'json', '~> 1.8.1'
 end
