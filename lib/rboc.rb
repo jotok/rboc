@@ -65,15 +65,7 @@ module Census
     # method attempts to load a key previously installed by Census#install_key!.
     #
     def api_key
-      unless @api_key
-        if File.exist? INSTALLED_KEY_PATH
-          File.open(INSTALLED_KEY_PATH) do |f|
-            @api_key = f.read
-          end
-        end
-      end
-
-      @api_key
+      @api_key ||= Census.installed_key
     end
 
     # these chainable methods mirror the field names in the HTTP get string
@@ -137,6 +129,14 @@ module Census
     def install_key!(key)
       File.open INSTALLED_KEY_PATH, 'w' do |f|
         f.write key
+      end
+    end
+
+    def installed_key
+      if File.exists? INSTALLED_KEY_PATH
+        File.read INSTALLED_KEY_PATH
+      else
+        nil
       end
     end
 

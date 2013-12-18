@@ -1,4 +1,4 @@
-# rboc: U.S. Census data in ruby
+# rboc: A ruby interace to the U.S. Census data API
 
 ## Quick Start
 
