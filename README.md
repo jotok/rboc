@@ -1,6 +1,8 @@
-# rboc: A ruby interace to the U.S. Census data API
+# rboc: A ruby interace to the U.S. Census Bureau data API
 
 ## Quick Start
+
+*This is in-progress work and I'm likely to push API-breaking changes until at least version 1.2. If you've stumbled upon this gem in the meantime and you'd like to start using it, feel free to contact me so I can warn you before breakage.*
 
 For each Census data file (e.g., acs5, sf1) there is a corresponding class method in Census (e.g. `Census.acs5`, `Census.sf1`). These methods take block arguments that can be used to specify your data request. For example, the API call
 
@@ -28,7 +30,7 @@ Currently, you have to know the variable and geography codes that you're interes
 
 The `rboc` gem is a ruby interface to the data API provided by the U.S. Census Bureau (the "boc" in `rboc` stands for Bureau of the Census). It provides a rubyish wrapper around the HTTP/GET interface and performs some basic validation on the request and response. If you're new to the Census API, then you may want to browse the [developer documentation](http://www.census.gov/developers/) and the [data documentation](http://www.census.gov/developers/data/) on the Census website. Before accessing the API you will need to [request a key](http://www.census.gov/developers/tos/key_request.html).
 
-Census data is divided between a number of files, like the American Community Survey (ACS) 5 year estimates file, the ACS 3 year estimates file, and the 2010 Census summary files. A complete list of files is found in the data documentation. A list of file abbreviations is given by `Census::FILES`. For each abbreviation there is a corresponding class method in the `Census` module which is used to access the file data. These methods all have the same signature. Using the "acs5" file as an example:
+Census data is divided between a number of files, like the American Community Survey (ACS) 5 year estimates file, the ACS 3 year estimates file, and the 2010 Census summary file. A complete list of files is found in the data documentation. A list of file abbreviations is given by `Census::FILES`. For each abbreviation there is a corresponding class method in the `Census` module which is used to access the file data. These methods all have the same signature. Using the "acs5" file as an example:
 
     Census.acs5(year: y, query: q) {|q| ...}
 
