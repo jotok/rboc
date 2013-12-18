@@ -201,6 +201,8 @@ module Census
       end
     end
 
+    # Returns the currently installed key or +nil+ if no key is installed.
+    #
     def installed_key
       if File.exists? INSTALLED_KEY_PATH
         File.read INSTALLED_KEY_PATH
