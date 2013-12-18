@@ -43,6 +43,7 @@ module Census
 
   class CensusApiError < StandardError; end
   class InvalidQueryError < CensusApiError; end
+  class InvalidKeyError < CensusApiError; end
   class NoMatchingRecordsError < CensusApiError; end
   class ServerSideError < CensusApiError; end
 
@@ -156,21 +157,26 @@ module Census
     # if the HTTP response code indicates a problem.
     #
     def api_raw(year, file, url_file, query)
+      yield query if block_given?
       url = api_url year, file, url_file, query
       puts "GET #{url}"
 
       c = Curl::Easy.new url
       c.perform
+      r = c.response_code
 
-      case c.response_code
-      when 400
+      if r == 200
+        return c.body_str
+      elsif r == 400
         raise InvalidQueryError
-      when 204
+      elsif r == 204
         raise NoMatchingRecordsError
-      when 500
+      elsif r == 500
         raise ServerSideError
+      elsif r == 302 && (c.head.include?("missing_key") || c.head.include?("invalid_key"))
+        raise InvalidKeyError
       else
-        c.body_str
+        raise CensusApiError, "Unexpected HTTP response code: #{r}"
       end
     end
 
@@ -205,13 +211,11 @@ module Census
   def self.api_call(file, url_file)
 
     define_singleton_method file do |year: FILE_VALID_YEARS[file].first, query: Query.new, &block|
-      # api_data year, file, url_file, &block
-      api_url year, file, url_file, query, &block
+      api_data year, file, url_file, query, &block
     end
 
-    define_singleton_method(file+'_raw') do |year: FILE_VALID_YEARS[file], query: Query.new, &block|
-      # api_raw year, file, url_file, &block
-      api_url year, file, url_file, query, &block
+    define_singleton_method(file+'_raw') do |year: FILE_VALID_YEARS[file].first, query: Query.new, &block|
+      api_raw year, file, url_file, query, &block
     end
   end
 

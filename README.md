@@ -43,6 +43,33 @@ All arguments are optional (although you'll probably get an `InvalidQueryError` 
 
 This example also demonstrates two ways to set query parameters. You can either assign directly to the query's instance variables, or you can use a chainable syntax that mirrors the parameters to the Census API.
 
+The data returned by `Census.acs5` (and friends) is a `Census::Data` object.
+
+    result = Census.acs5 {|q| q.get('B00001_001E').for('state')}
+    result.colnames
+    # => ["B00001_001E", "state"]
+
+    # result.each returns each row as a hash using column names as keys
+    result.each {|row| p row}
+    # {"B00001_001E" => "372109", "state" => "01"}
+    # {"B00001_001E" => "72384", "state" => "02}
+    # ... approximately 50 states
+
+    # you can also iterate over rows without column names
+    result.rows.each {|row| p row}
+    # ["372109", "01"]
+    # ["72384", "02"]
+    # ...
+
+For each API method there is a corresponding "raw" method which returns the response body as an unmodified string.
+
+    result = Census.acs5_raw {|q| q.get('B00001_001E').for('state')}
+    # => "[[\"B00001_001E\",\"state\"],\n[\"372109\",\"01\"], ..."
+
+Note that the Census API only allows you to request 50 or fewer variables at a time. `Census.acs5_raw` will raise an error if you request more than 50 variables. However, `Census.acs5` will split the request into chunks and merge the response into a single `Census::Data` object.
+
+I hope this gets you started hacking with Census data. Please contact me with bug reports and suggestions.
+
 ## Future Work
 
 * 1.2: Add functionality to let the user search for codes using regexes or strings.
