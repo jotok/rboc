@@ -38,8 +38,10 @@ module Census
     end
 
     def each
-      @rows.each do |row|
-        yield Hash[@colnames.zip row]
+      Enumerator.new do |y|
+        @rows.each do |row|
+          y << Hash[@colnames.zip row]
+        end
       end
     end
 
