@@ -10,7 +10,6 @@ Gem::Specification.new do |s|
                    'lib/rboc/census.rb',
                    'lib/rboc/geo.rb',
                    'lib/rboc/data.rb',
-                   'data/acs_1yr_profile_2012.xml'
                   ]
   s.homepage    = "http://github.com/jotok/rboc"
   s.license     = 'Public Domain'

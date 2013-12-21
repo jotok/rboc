@@ -81,6 +81,18 @@ module Census
 
   class <<self
 
+    # Set up the local directory where cached data and the installed key will be stored.
+    def setup_local_directory
+      unless Dir.exists? LOCAL_DATA_DIR
+        Dir.mkdir LOCAL_DATA_DIR
+      end
+
+      unless Dir.exists? CACHE_DIR
+        Dir.mkdir CACHE_DIR
+      end
+
+    end
+
     # Writes the given key to a local file. If a key is installed, then you don't have to specify
     # a key in your query.
     #
@@ -100,25 +112,49 @@ module Census
       end
     end
 
+    # Looks for the url basename in the cache directory. If it doesn't exist, then downloads the
+    # file from the web.
+    #
+    def get_cached_url(url)
+      local_file = File.join CACHE_DIR, File.basename(url)
+      if File.exists? local_file
+        File.read local_file
+      else
+        puts "Getting #{url}"
+        c = Curl::Easy.new url
+        c.perform
+        file_content = c.body_str
+        
+        File.open local_file, 'w' do |f|
+          f.write file_content
+        end
+
+        file_content
+      end
+    end
+
+    def files
+      @@files
+    end
+
     # Constructs the URL needed to perform the query on the given file.
     #
-    def api_url(year, file, url_file, query)
+    def api_url(year, file, query)
       year = year.to_i
-      unless FILE_VALID_YEARS[file].include? year
+      unless @@file_valid_years[file].include? year
         raise ArgumentError, "Invalid year '#{year}' for file '#{file}'"
       end
 
-      url_file ||= file
       yield query if block_given?
-      [API_URL, year.to_s,  "#{url_file}?#{query.to_s}"].join('/')
+      [API_URL, year.to_s,  "#{file}?#{query.to_s}"].join('/')
     end
 
     # Accesses the data api and returns the unmodified body of the HTTP response.  Raises errors
     # if the HTTP response code indicates a problem.
     #
-    def api_raw(year, file, url_file, query)
+    def api_raw(year, file, query)
       yield query if block_given?
-      url = api_url year, file, url_file, query
+      url = api_url year, file, query
       puts "GET #{url}"
 
       c = Curl::Easy.new url
@@ -142,17 +178,17 @@ module Census
 
     # Accesses the the data api and parses the result into a Census::Data object.
     #
-    def api_data(year, file, url_file, query)
+    def api_data(year, file, query)
       yield query if block_given?
 
       # download the first 50 or fewer variables
-      json = api_raw year, file, url_file, query[0...50]
+      json = api_raw year, file, query[0...50]
       d = Data.new json
 
       # download remaining variables 50 at a time
       offset = 50
       while offset <= query.variables.length
-        json = api_raw year, file, url_file, query[offset...(offset+50)]
+        json = api_raw year, file, query[offset...(offset+50)]
         json = JSON.parse json
 
         # sometimes the API returns a descriptive hash (in a single element array) if the
@@ -168,16 +204,15 @@ module Census
 
   end
 
-  def self.api_call(file, url_file)
+  def self.api_call(file)
 
-    define_singleton_method file do |year: FILE_VALID_YEARS[file].first, query: Query.new, &block|
-      api_data year, file, url_file, query, &block
+    define_singleton_method file do |year: @@file_valid_years[file].first, query: Query.new, &block|
+      api_data year, file, query, &block
     end
 
-    define_singleton_method(file+'_raw') do |year: FILE_VALID_YEARS[file].first, query: Query.new, &block|
-      api_raw year, file, url_file, query, &block
+    define_singleton_method(file+'_raw') do |year: @@file_valid_years[file].first, query: Query.new, &block|
+      api_raw year, file, query, &block
     end
   end
-
 
 end

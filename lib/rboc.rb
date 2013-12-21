@@ -87,41 +87,31 @@ module Census
   #
   LOCAL_DATA_DIR = File.join ENV['HOME'], '.census'
 
+  # Where cached responses from the Census API. Only data descriptions are stored.
+  #
+  CACHE_DIR = File.join LOCAL_DATA_DIR, 'cache'
+
   # Path to the installed API key.
   #
   INSTALLED_KEY_PATH = File.join LOCAL_DATA_DIR, 'installed_key'
 
-  # Data files accessible through the Census API.
+  # Data discoverable API URL
   #
-  FILES = ['acs1', 'acs1_cd', 'acs3', 'acs5', 'sf1', 'sf3']
+  DATA_DISCOVERY_URL = 'http://api.census.gov/data.json'
 
-  # List valid years of data for each data file.
-  #
-  FILE_VALID_YEARS = {
-    'acs1'    => [2012],
-    'acs1_cd' => [2011],
-    'acs3'    => [2012],
-    'acs5'    => [2012, 2011, 2010],
-    'sf1'     => [2010, 2000, 1990],
-    'sf3'     => [2000, 1990]
-  }
+  self.setup_local_directory
+  data_sets = JSON.parse self.get_cached_url(DATA_DISCOVERY_URL)
 
-  FILE_URL_SUBST = {
-    'acs1' => 'acs1/profile',
-    'acs3' => 'acs3/profile'
-  }
-
-  FILES.each do |f| 
-    self.api_call f, FILE_URL_SUBST[f]
+  # extract unique file names a valid years
+  @@files = []
+  @@file_valid_years = Hash.new {|h, k| h[k] = []}
+  data_sets.each do |d|
+    file = d['c_dataset'].join('_')
+    @@files << file
+    @@file_valid_years[file] << d['c_vintage'].to_i
   end
 
-  unless Dir.exists? LOCAL_DATA_DIR
-    Dir.mkdir LOCAL_DATA_DIR
-  end
-
-  cache_dir = File.join LOCAL_DATA_DIR, 'cache'
-  unless Dir.exists? cache_dir
-    Dir.mkdir cache_dir
-  end
+  @@files.sort!.uniq!
+  @@files.each {|f| self.api_call f}
 
 end
