@@ -18,7 +18,7 @@ To specify the year of data that you're looking for, use a keyword argument:
 
 The most recent year is used by default.
 
-You can "install" your API key (i.e., save it to a file in the gem's installation directory) by calling
+You can "install" your API key (i.e., save it to a file in your home directory) by calling
 
     Census.install_key! 'xxx'
 
@@ -30,7 +30,7 @@ Currently, you have to know the variable and geography codes that you're interes
 
 The `rboc` gem is a ruby interface to the data API provided by the U.S. Census Bureau (the "boc" in `rboc` stands for Bureau of the Census). It provides a rubyish wrapper around the HTTP/GET interface and performs some basic validation on the request and response. If you're new to the Census API, then you may want to browse the [developer documentation](http://www.census.gov/developers/) and the [data documentation](http://www.census.gov/developers/data/) on the Census website. Before accessing the API you will need to [request a key](http://www.census.gov/developers/tos/key_request.html).
 
-Census data is divided between a number of files, like the American Community Survey (ACS) 5 year estimates file, the ACS 3 year estimates file, and the 2010 Census summary file. A complete list of files is found in the data documentation. A list of file abbreviations is given by `Census::FILES`. For each abbreviation there is a corresponding class method in the `Census` module which is used to access the file data. These methods all have the same signature. Using the "acs5" file as an example:
+Census data is divided between a number of files, like the American Community Survey (ACS) 5 year estimates file, the ACS 3 year estimates file, and the 2010 Census summary file. A complete list of files is found in the data documentation. A list of file abbreviations is given by `Census::FIL::FILES`. For each abbreviation there is a corresponding class method in the `Census` module which is used to access the file data. These methods all have the same signature. Using the "acs5" file as an example:
 
     Census.acs5(year: y, query: q) {|q| ...}
 

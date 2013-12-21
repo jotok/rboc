@@ -133,15 +133,11 @@ module Census
       end
     end
 
-    def files
-      @@files
-    end
-
     # Constructs the URL needed to perform the query on the given file.
     #
     def api_url(year, file, query)
       year = year.to_i
-      unless @@file_valid_years[file].include? year
+      unless FILE_VALID_YEARS[file].include? year
         raise ArgumentError, "Invalid year '#{year}' for file '#{file}'"
       end
 
@@ -206,11 +202,11 @@ module Census
 
   def self.api_call(file)
 
-    define_singleton_method file do |year: @@file_valid_years[file].first, query: Query.new, &block|
+    define_singleton_method file do |year: FILE_VALID_YEARS[file].first, query: Query.new, &block|
       api_data year, file, query, &block
     end
 
-    define_singleton_method(file+'_raw') do |year: @@file_valid_years[file].first, query: Query.new, &block|
+    define_singleton_method(file+'_raw') do |year: FILE_VALID_YEARS[file].first, query: Query.new, &block|
       api_raw year, file, query, &block
     end
   end

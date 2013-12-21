@@ -13,7 +13,7 @@ require 'rboc/data'
 # documentation}[http://www.census.gov/developers/data/] on the Census website for a description of
 # all available files.
 #
-# In +rboc+, the list of available files (using abbreviated names) is contained in +Census::FILES+.
+# In +rboc+, the list of available files (using abbreviated names) is contained in +Census::files+.
 # For each entry in that array, there is a corresponding class method in +Census+ that you can use
 # to query the file. These methods all have the same signature:
 #
@@ -103,15 +103,17 @@ module Census
   data_sets = JSON.parse self.get_cached_url(DATA_DISCOVERY_URL)
 
   # extract unique file names a valid years
-  @@files = []
-  @@file_valid_years = Hash.new {|h, k| h[k] = []}
+  files = []
+  file_valid_years = Hash.new {|h, k| h[k] = []}
   data_sets.each do |d|
     file = d['c_dataset'].join('_')
-    @@files << file
-    @@file_valid_years[file] << d['c_vintage'].to_i
+    files << file
+    file_valid_years[file] << d['c_vintage'].to_i
   end
 
-  @@files.sort!.uniq!
-  @@files.each {|f| self.api_call f}
+  FILES = files.sort!.uniq!
+  FILE_VALID_YEARS = file_valid_years
+
+  FILES.each {|f| self.api_call f}
 
 end
