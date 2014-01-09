@@ -1,6 +1,6 @@
 Gem::Specification.new do |s|
   s.name        = 'rboc'
-  s.version     = '1.0.1.pre'
+  s.version     = '1.1.0.pre'
   s.date        = '2013-12-16'
   s.summary     = 'An interface to the API provided by the U.S. Census Bureau'
   s.description = s.summary
