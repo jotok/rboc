@@ -14,6 +14,6 @@ Gem::Specification.new do |s|
   s.homepage    = "http://github.com/jotok/rboc"
   s.license     = 'Public Domain'
 
-  s.add_runtime_dependency 'curb', '~> 0.8.5'
-  s.add_runtime_dependency 'json', '~> 1.8.1'
+  s.add_runtime_dependency 'curb', '~> 0.8'
+  s.add_runtime_dependency 'json', '~> 1.8'
 end

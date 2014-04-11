@@ -82,7 +82,7 @@ module Census
   class <<self
 
     # Set up the local directory where cached data and the installed key will be stored.
-    def setup_local_directory
+    def setup_local_directory!
       unless Dir.exists? LOCAL_DATA_DIR
         Dir.mkdir LOCAL_DATA_DIR
       end
@@ -133,82 +133,5 @@ module Census
       end
     end
 
-    # Constructs the URL needed to perform the query on the given file.
-    #
-    def api_url(year, file, query)
-      year = year.to_i
-      unless FILE_VALID_YEARS[file].include? year
-        raise ArgumentError, "Invalid year '#{year}' for file '#{file}'"
-      end
-
-      yield query if block_given?
-      [API_URL, year.to_s,  "#{file}?#{query.to_s}"].join('/')
-    end
-
-    # Accesses the data api and returns the unmodified body of the HTTP response.  Raises errors
-    # if the HTTP response code indicates a problem.
-    #
-    def api_raw(year, file, query)
-      yield query if block_given?
-      url = api_url year, file, query
-      puts "GET #{url}"
-
-      c = Curl::Easy.new url
-      c.perform
-      r = c.response_code
-
-      if r == 200
-        return c.body_str
-      elsif r == 400
-        raise InvalidQueryError
-      elsif r == 204
-        raise NoMatchingRecordsError
-      elsif r == 500
-        raise ServerSideError
-      elsif r == 302 && (c.head.include?("missing_key") || c.head.include?("invalid_key"))
-        raise InvalidKeyError
-      else
-        raise CensusApiError, "Unexpected HTTP response code: #{r}"
-      end
-    end
-
-    # Accesses the the data api and parses the result into a Census::Data object.
-    #
-    def api_data(year, file, query)
-      yield query if block_given?
-
-      # download the first 50 or fewer variables
-      json = api_raw year, file, query[0...50]
-      d = Data.new json
-
-      # download remaining variables 50 at a time
-      offset = 50
-      while offset <= query.variables.length
-        json = api_raw year, file, query[offset...(offset+50)]
-        json = JSON.parse json
-
-        # sometimes the API returns a descriptive hash (in a single element array) if the
-        # requested columns are invalid
-        raise InvalidQueryError if json.first.is_a? Hash
-
-        d.merge! json
-        offset += 50
-      end
-
-      d
-    end
-
   end
-
-  def self.api_call(file)
-
-    define_singleton_method file do |year: FILE_VALID_YEARS[file].first, query: Query.new, &block|
-      api_data year, file, query, &block
-    end
-
-    define_singleton_method(file+'_raw') do |year: FILE_VALID_YEARS[file].first, query: Query.new, &block|
-      api_raw year, file, query, &block
-    end
-  end
-
 end
