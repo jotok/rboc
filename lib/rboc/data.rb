@@ -1,4 +1,3 @@
-require 'curb'
 require 'json'
 
 module Census
@@ -46,22 +45,22 @@ module Census
     def query_raw(q=Query.new)
       yield q if block_given?
 
-      url = self.web_service + '?' + q.to_s
-      puts "GET #{url}"
+      uri = URI(self.web_service + '?' + q.to_s)
+      puts "GET #{uri.to_s}"
 
-      c = Curl::Easy.new url
-      c.perform
-      r = c.response_code
+      res = Net::HTTP.get_response uri
+      c = res.code.to_i
+      h = res.to_hash
 
-      if r == 200
-        return c.body_str
-      elsif r == 400
+      if c == 200
+        return res.body
+      elsif c == 400
         raise InvalidQueryError
-      elsif r == 204
+      elsif c == 204
         raise NoMatchingRecordsError
-      elsif r == 500
+      elsif c == 500
         raise ServerSideError
-      elsif r == 302 && (c.head.include?("missing_key") || c.head.include?("invalid_key"))
+      elsif c == 302 && (h.include?("missing_key") || h.include?("invalid_key"))
         raise InvalidKeyError
       else
         raise CensusApiError, "Unexpected HTTP response code: #{r}"

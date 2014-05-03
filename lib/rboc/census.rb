@@ -120,10 +120,8 @@ module Census
       if File.exists? local_file
         File.read local_file
       else
-        puts "Getting #{url}"
-        c = Curl::Easy.new url
-        c.perform
-        file_content = c.body_str
+        puts "GET #{url}"
+        file_content = Net::HTTP.get URI(url)
         
         File.open local_file, 'w' do |f|
           f.write file_content

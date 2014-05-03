@@ -1,6 +1,5 @@
-require 'curb'
 require 'json'
-require 'uri'
+require 'net/http'
 require 'set'
 
 require 'rboc/census'
